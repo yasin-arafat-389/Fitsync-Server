@@ -84,24 +84,24 @@ async function run() {
     };
 
     // Store user info in the database
-    // app.post("/users", async (req, res) => {
-    //   const user = req.body;
-    //   const query = { email: user.email };
-    //   const isExists = await usersCollection.findOne(query);
-    //   if (isExists) {
-    //     return res.send({ message: "User already exists" });
-    //   }
-    //   const result = await usersCollection.insertOne(user);
-    //   res.send(result);
-    // });
+    app.post("/users", async (req, res) => {
+      const user = req.body;
+      const query = { email: user.email };
+      const isExists = await usersCollection.findOne(query);
+      if (isExists) {
+        return res.send({ message: "User already exists" });
+      }
+      const result = await usersCollection.insertOne(user);
+      res.send(result);
+    });
 
     // Get specific user data filtered by email
-    // app.get("/users", async (req, res) => {
-    //   const email = req.query.email;
-    //   const query = { email: email };
-    //   const result = await usersCollection.findOne(query);
-    //   res.send(result);
-    // });
+    app.get("/users", async (req, res) => {
+      const email = req.query.email;
+      const query = { email: email };
+      const result = await usersCollection.findOne(query);
+      res.send(result);
+    });
 
     //
   } finally {
