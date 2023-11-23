@@ -20,19 +20,19 @@ app.use(cookieParser());
 
 // Middlewares
 // Token Verification
-// const verifyToken = (req, res, next) => {
-//   if (!req.headers.authorization) {
-//     return res.status(401).send({ message: "unauthorized access" });
-//   }
-//   const token = req.headers.authorization.split(" ")[1];
-//   jwt.verify(token, process.env.TOKEN_SECRET, (err, decoded) => {
-//     if (err) {
-//       return res.status(401).send({ message: "unauthorized access" });
-//     }
-//     req.user = decoded;
-//     next();
-//   });
-// };
+const verifyToken = (req, res, next) => {
+  if (!req.headers.authorization) {
+    return res.status(401).send({ message: "unauthorized access" });
+  }
+  const token = req.headers.authorization.split(" ")[1];
+  jwt.verify(token, process.env.TOKEN_SECRET, (err, decoded) => {
+    if (err) {
+      return res.status(401).send({ message: "unauthorized access" });
+    }
+    req.user = decoded;
+    next();
+  });
+};
 
 const uri = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASSWORD}@cluster0.gef2z8f.mongodb.net/?retryWrites=true&w=majority`;
 
