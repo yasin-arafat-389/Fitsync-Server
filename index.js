@@ -45,7 +45,10 @@ const client = new MongoClient(uri, {
 });
 
 async function run() {
-  const usersCollection = client.db("A12").collection("users");
+  const usersCollection = client.db("FitSync").collection("users");
+  const blogsCollection = client.db("FitSync").collection("blogs");
+  const newsletterCollection = client.db("FitSync").collection("newsletter");
+
   try {
     // Token generation API
     app.post("/access-token", async (req, res) => {
@@ -103,7 +106,26 @@ async function run() {
       res.send(result);
     });
 
-    //
+    // Get blog details
+    app.get("/blog/details/:id", async (req, res) => {
+      const id = req.params.id;
+      const query = { _id: new ObjectId(id) };
+      const result = await blogsCollection.findOne(query);
+      res.send(result);
+    });
+
+    //Post Newsletter
+    app.post("/newsletter", async (req, res) => {
+      const { name, email } = req.body;
+      const existingSubscriber = await newsletterCollection.findOne({
+        email,
+      });
+      if (existingSubscriber) {
+        return res.send("Email already subscribed");
+      }
+      await newsletterCollection.insertOne({ name, email });
+      res.send("Successfully Subscribed");
+    });
   } finally {
   }
 }
