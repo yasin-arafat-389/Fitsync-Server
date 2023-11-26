@@ -48,6 +48,7 @@ async function run() {
   const usersCollection = client.db("FitSync").collection("users");
   const blogsCollection = client.db("FitSync").collection("blogs");
   const newsletterCollection = client.db("FitSync").collection("newsletter");
+  const trainersCollection = client.db("FitSync").collection("trainers");
 
   try {
     // Token generation API
@@ -125,6 +126,44 @@ async function run() {
       }
       await newsletterCollection.insertOne({ name, email });
       res.send("Successfully Subscribed");
+    });
+
+    // Post API to store become a trainer requests
+    app.post("/trainers", async (req, res) => {
+      const { formData, uploadedImage } = req.body;
+
+      const newTrainer = {
+        name: formData.name,
+        email: formData.email,
+        age: formData.age,
+        experience: formData.experience,
+        status: formData.status,
+        image: uploadedImage,
+        skills: formData.skills,
+        availableDays: formData.availableDays,
+        availableTime: formData.availableTime,
+      };
+
+      const result = await trainersCollection.insertOne(newTrainer);
+
+      res.send(result);
+    });
+
+    // Get all trainer data
+    app.get("/all-trainers", async (req, res) => {
+      const filter = "accepted";
+      const trainers = await trainersCollection
+        .find({ status: filter })
+        .toArray();
+      res.send(trainers);
+    });
+
+    // Get single trainer data
+    app.get("/trainers", async (req, res) => {
+      const email = req.query.email;
+      const query = { email: email };
+      const result = await trainersCollection.findOne(query);
+      res.send(result);
     });
   } finally {
   }
