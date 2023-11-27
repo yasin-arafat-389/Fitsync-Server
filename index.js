@@ -49,6 +49,8 @@ async function run() {
   const blogsCollection = client.db("FitSync").collection("blogs");
   const newsletterCollection = client.db("FitSync").collection("newsletter");
   const trainersCollection = client.db("FitSync").collection("trainers");
+  const pricingCollection = client.db("FitSync").collection("pricing");
+  const classesCollection = client.db("FitSync").collection("classes");
 
   try {
     // Token generation API
@@ -158,11 +160,33 @@ async function run() {
       res.send(trainers);
     });
 
-    // Get single trainer data
+    // Get single trainer data by email
     app.get("/trainers", async (req, res) => {
       const email = req.query.email;
       const query = { email: email };
       const result = await trainersCollection.findOne(query);
+      res.send(result);
+    });
+
+    // Get single trainer data by id
+    app.get("/trainers/single/:id", async (req, res) => {
+      const id = req.params.id;
+      const query = { _id: new ObjectId(id) };
+      const result = await trainersCollection.findOne(query);
+      res.send(result);
+    });
+
+    // Post Pricing data to db
+    app.post("/package/subscribed", async (req, res) => {
+      let data = req.body;
+      const result = await pricingCollection.insertOne(data);
+      res.send(result);
+    });
+
+    // Post New Class data to db
+    app.post("/classes", async (req, res) => {
+      let data = req.body;
+      const result = await classesCollection.insertOne(data);
       res.send(result);
     });
   } finally {
