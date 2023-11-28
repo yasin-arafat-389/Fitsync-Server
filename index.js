@@ -51,6 +51,8 @@ async function run() {
   const trainersCollection = client.db("FitSync").collection("trainers");
   const pricingCollection = client.db("FitSync").collection("pricing");
   const classesCollection = client.db("FitSync").collection("classes");
+  const forumsCollection = client.db("FitSync").collection("forums");
+  const votesCollection = client.db("FitSync").collection("votes");
 
   try {
     // Token generation API
@@ -187,6 +189,77 @@ async function run() {
     app.post("/classes", async (req, res) => {
       let data = req.body;
       const result = await classesCollection.insertOne(data);
+      res.send(result);
+    });
+
+    // Get all classes
+    app.get("/classes", async (req, res) => {
+      const classes = await classesCollection.find().toArray();
+      res.send(classes);
+    });
+
+    // Get single class by id
+    app.get("/classes/:id", async (req, res) => {
+      const id = req.params.id;
+      const query = { _id: new ObjectId(id) };
+      const result = await classesCollection.findOne(query);
+      res.send(result);
+    });
+
+    // Post New forum data to db
+    app.post("/forums", async (req, res) => {
+      let data = req.body;
+      const result = await forumsCollection.insertOne(data);
+      res.send(result);
+    });
+
+    // Get all forum posts
+    app.get("/forums", async (req, res) => {
+      const query = req.query;
+      const page = query.page;
+
+      const pageNumber = parseInt(page);
+      const perPage = 6;
+
+      const skip = pageNumber * perPage;
+      const forums = forumsCollection.find().skip(skip).limit(perPage);
+      const result = await forums.toArray();
+      const forumsCounts = await forumsCollection.countDocuments();
+
+      res.json({ result, forumsCounts });
+    });
+
+    // Get forum details
+    app.get("/forum/details/:id", async (req, res) => {
+      const id = req.params.id;
+      const query = { _id: new ObjectId(id) };
+      const result = await forumsCollection.findOne(query);
+      res.send(result);
+    });
+
+    // Post vote details
+    app.post("/forum/vote", async (req, res) => {
+      const { id, type, user } = req.body;
+      const result = await votesCollection.findOneAndUpdate(
+        { _id: new ObjectId(id) },
+        {
+          $inc: {
+            upvoteCount: type === "up" ? 1 : 0,
+            downvoteCount: type === "down" ? 1 : 0,
+          },
+          $addToSet: { votedUsers: user },
+        },
+        { upsert: true, returnDocument: "after" }
+      );
+
+      res.send({ success: true });
+    });
+
+    // Get vote counts details
+    app.get("/forum/vote/:id", async (req, res) => {
+      const id = req.params.id;
+      const query = { _id: new ObjectId(id) };
+      const result = await votesCollection.findOne(query);
       res.send(result);
     });
   } finally {
