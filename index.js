@@ -53,6 +53,9 @@ async function run() {
   const classesCollection = client.db("FitSync").collection("classes");
   const forumsCollection = client.db("FitSync").collection("forums");
   const votesCollection = client.db("FitSync").collection("votes");
+  const adminBalanceCollection = client
+    .db("FitSync")
+    .collection("adminBalance");
 
   try {
     // Token generation API
@@ -161,7 +164,7 @@ async function run() {
 
     // Update trainer status (Accept)
     app.post("/update-trainer-status/accept", async (req, res) => {
-      const { trainerId, status, email, role } = req.body;
+      const { trainerId, status, email, role, salary } = req.body;
 
       if (!ObjectId.isValid(trainerId)) {
         return res.status(400).json({ error: "Invalid trainerId format" });
@@ -169,7 +172,7 @@ async function run() {
 
       const result1 = await trainersCollection.updateOne(
         { _id: new ObjectId(trainerId) },
-        { $set: { status } }
+        { $set: { status: status, salary: salary } }
       );
       let result2 = await usersCollection.updateOne(
         { email: email },
@@ -246,8 +249,61 @@ async function run() {
     // Post Pricing data to db
     app.post("/package/subscribed", async (req, res) => {
       let data = req.body;
+      const subscriptionPrice = parseInt(data.price);
+      const adminBalance = await adminBalanceCollection.findOne();
+
+      const newTotalBalance =
+        (adminBalance.totalBalance || 0) + subscriptionPrice;
+
+      await adminBalanceCollection.updateOne(
+        {},
+        { $set: { totalBalance: newTotalBalance } }
+      );
+
       const result = await pricingCollection.insertOne(data);
       res.send(result);
+    });
+
+    // Get admin balance
+    app.get("/balance", async (req, res) => {
+      const result = await adminBalanceCollection.findOne();
+      res.send(result);
+    });
+
+    // Update salary status
+    app.put("/update-salary-status/:id", async (req, res) => {
+      const { id } = req.params;
+      const { status } = req.body;
+
+      try {
+        const result = await trainersCollection.updateOne(
+          { _id: new ObjectId(id) },
+          { $set: { salary: status } }
+        );
+
+        const adminBalance = await adminBalanceCollection.findOne();
+
+        const newTotalBalance = (adminBalance.totalBalance || 0) - 20;
+        const newTotalPaid = (adminBalance.totalPaid || 0) + 20;
+
+        await adminBalanceCollection.updateOne(
+          {},
+          { $set: { totalBalance: newTotalBalance, totalPaid: newTotalPaid } }
+        );
+
+        if (result.modifiedCount > 0) {
+          res.json({ success: true, message: "Status updated successfully." });
+        } else {
+          res
+            .status(404)
+            .json({ success: false, message: "Resource not found." });
+        }
+      } catch (error) {
+        console.error(error);
+        res
+          .status(500)
+          .json({ success: false, message: "Internal Server Error." });
+      }
     });
 
     // Post New Class data to db
