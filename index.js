@@ -132,6 +132,12 @@ async function run() {
       res.send("Successfully Subscribed");
     });
 
+    //Get Newsletter
+    app.get("/all-Subscribers", async (req, res) => {
+      const subscribers = await newsletterCollection.find().toArray();
+      res.send(subscribers);
+    });
+
     // Post API to store become a trainer requests
     app.post("/trainers", async (req, res) => {
       const { formData, uploadedImage } = req.body;
@@ -153,9 +159,68 @@ async function run() {
       res.send(result);
     });
 
-    // Get all trainer data
+    // Update trainer status (Accept)
+    app.post("/update-trainer-status/accept", async (req, res) => {
+      const { trainerId, status, email, role } = req.body;
+
+      if (!ObjectId.isValid(trainerId)) {
+        return res.status(400).json({ error: "Invalid trainerId format" });
+      }
+
+      const result1 = await trainersCollection.updateOne(
+        { _id: new ObjectId(trainerId) },
+        { $set: { status } }
+      );
+      let result2 = await usersCollection.updateOne(
+        { email: email },
+        { $set: { role: role } }
+      );
+
+      if (result1.modifiedCount && result2.modifiedCount === 1) {
+        return res.json({
+          success: true,
+          message: "Trainer status updated successfully",
+        });
+      } else {
+        return res.status(404).json({ error: "Trainer not found" });
+      }
+    });
+
+    // Update trainer status (Reject)
+    app.post("/update-trainer-status/reject", async (req, res) => {
+      const { trainerId, status, email, role } = req.body;
+
+      if (!ObjectId.isValid(trainerId)) {
+        return res.status(400).json({ error: "Invalid trainerId format" });
+      }
+
+      const result = await trainersCollection.updateOne(
+        { _id: new ObjectId(trainerId) },
+        { $set: { status } }
+      );
+
+      if (result.modifiedCount === 1) {
+        return res.json({
+          success: true,
+          message: "Trainer status updated successfully",
+        });
+      } else {
+        return res.status(404).json({ error: "Trainer not found" });
+      }
+    });
+
+    // Get all trainer data (Accepted)
     app.get("/all-trainers", async (req, res) => {
       const filter = "accepted";
+      const trainers = await trainersCollection
+        .find({ status: filter })
+        .toArray();
+      res.send(trainers);
+    });
+
+    // Get all trainer data (requested)
+    app.get("/all-trainers/requested", async (req, res) => {
+      const filter = "requested";
       const trainers = await trainersCollection
         .find({ status: filter })
         .toArray();
