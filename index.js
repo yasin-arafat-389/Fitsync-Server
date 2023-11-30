@@ -12,7 +12,11 @@ const nodemailer = require("nodemailer");
 // Parsers
 app.use(
   cors({
-    origin: ["http://localhost:5173"],
+    origin: [
+      "http://localhost:5173",
+      "https://fitsync-be2e6.web.app",
+      "https://fitsync-be2e6.firebaseapp.com",
+    ],
     credentials: true,
   })
 );
