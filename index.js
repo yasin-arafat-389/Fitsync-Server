@@ -7,6 +7,7 @@ require("dotenv").config();
 const stripe = require("stripe")(process.env.STRIPE_SECRET);
 const app = express();
 const port = process.env.PORT || 5001;
+const nodemailer = require("nodemailer");
 
 // Parsers
 app.use(
@@ -31,6 +32,30 @@ const verifyToken = (req, res, next) => {
     }
     req.user = decoded;
     next();
+  });
+};
+
+// Node mailer
+const sendMail = (to, subject, text) => {
+  let transporter = nodemailer.createTransport({
+    service: "gmail",
+    host: process.env.SMTP_HOST,
+    port: process.env.SMTP_PORT,
+    secure: false,
+    auth: {
+      user: process.env.SMTP_MAIL,
+      pass: process.env.SMTP_PASSWORD,
+    },
+  });
+
+  transporter.sendMail({
+    from: {
+      name: "FitSync",
+      address: process.env.SMTP_MAIL,
+    },
+    to: to,
+    subject: subject,
+    text: text,
   });
 };
 
@@ -191,7 +216,7 @@ async function run() {
 
     // Update trainer status (Reject)
     app.post("/update-trainer-status/reject", async (req, res) => {
-      const { trainerId, status, email, role } = req.body;
+      const { trainerId, status } = req.body;
 
       if (!ObjectId.isValid(trainerId)) {
         return res.status(400).json({ error: "Invalid trainerId format" });
@@ -261,6 +286,20 @@ async function run() {
       );
 
       const result = await pricingCollection.insertOne(data);
+      res.send(result);
+    });
+
+    // Get all members who paid
+    app.get("/package/subscribed", async (req, res) => {
+      const result = await pricingCollection.find().toArray();
+      res.send(result);
+    });
+
+    // Get all members filtered by choosen trainer
+    app.get("/booked/trainer", async (req, res) => {
+      const email = req.query.email;
+      const query = { trainerEmail: email };
+      const result = await pricingCollection.find(query).toArray();
       res.send(result);
     });
 
@@ -383,15 +422,35 @@ async function run() {
       const result = await votesCollection.findOne(query);
       res.send(result);
     });
+
+    // API endpoint to send email
+
+    app.post("/send-instruction", express.json(), (req, res) => {
+      const { to, subject, message } = req.body;
+
+      if (!to || !subject || !message) {
+        return res.status(400).json({ error: "Missing required parameters" });
+      }
+
+      try {
+        sendMail(to, subject, message);
+        res
+          .status(200)
+          .json({ success: true, message: "Email sent successfully" });
+      } catch (error) {
+        console.error("Error sending email:", error);
+        res.status(500).json({ error: "Internal server error" });
+      }
+    });
   } finally {
   }
 }
 run().catch(console.dir);
 
 app.get("/", (req, res) => {
-  res.send("Server is up and running");
+  res.send("FitSync server is up and running");
 });
 
 app.listen(port, () => {
-  console.log(`App listening on port ${port}`);
+  console.log(`FitSync listening on port ${port}`);
 });
