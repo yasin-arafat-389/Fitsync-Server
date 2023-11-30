@@ -216,7 +216,13 @@ async function run() {
 
     // Update trainer status (Reject)
     app.post("/update-trainer-status/reject", async (req, res) => {
-      const { trainerId, status } = req.body;
+      const { trainerId, status, email } = req.body;
+
+      sendMail(
+        email,
+        "Request Rejected",
+        "We are sorry to inform you that you are not yet eligible to be a trainer at FitSync. "
+      );
 
       if (!ObjectId.isValid(trainerId)) {
         return res.status(400).json({ error: "Invalid trainerId format" });
@@ -424,7 +430,6 @@ async function run() {
     });
 
     // API endpoint to send email
-
     app.post("/send-instruction", express.json(), (req, res) => {
       const { to, subject, message } = req.body;
 
@@ -441,6 +446,47 @@ async function run() {
         console.error("Error sending email:", error);
         res.status(500).json({ error: "Internal server error" });
       }
+    });
+
+    // Get member activity data
+    app.get("/my-activity", async (req, res) => {
+      const userEmail = req.query.email;
+
+      // Find pricing data for the user
+      const pricingData = await pricingCollection
+        .find({ email: userEmail })
+        .toArray();
+
+      // Extract unique trainer names
+      const uniqueTrainers = Array.from(
+        new Set(pricingData.map((item) => item.trainer))
+      );
+
+      // Find trainer details and images
+      const trainerDetails = await Promise.all(
+        uniqueTrainers.map(async (trainerName) => {
+          const trainer = await trainersCollection.findOne({
+            name: trainerName,
+          });
+          return {
+            name: trainerName,
+            image: trainer ? trainer.image : null,
+          };
+        })
+      );
+
+      // Bind images to pricingData
+      const pricingDataWithImages = pricingData.map((item) => {
+        const trainerDetail = trainerDetails.find(
+          (trainer) => trainer.name === item.trainer
+        );
+        return {
+          ...item,
+          image: trainerDetail ? trainerDetail.image : null,
+        };
+      });
+
+      res.json({ pricingData: pricingDataWithImages, trainerDetails });
     });
   } finally {
   }
