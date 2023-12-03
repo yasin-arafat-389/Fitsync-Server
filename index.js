@@ -494,7 +494,7 @@ async function run() {
     });
 
     // API endpoint to reject a member
-    app.post("/reject-member", express.json(), (req, res) => {
+    app.post("/reject-member", (req, res) => {
       const { email } = req.body;
 
       if (!email) {
