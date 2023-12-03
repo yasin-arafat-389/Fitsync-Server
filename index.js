@@ -8,6 +8,15 @@ const stripe = require("stripe")(process.env.STRIPE_SECRET);
 const app = express();
 const port = process.env.PORT || 5001;
 const nodemailer = require("nodemailer");
+const {
+  sendRequestAcceptedEmail,
+} = require("./Utils/RequestAcceptedEmail/SendRequestAcceptedEmail");
+const {
+  sendRequestRejectedEmail,
+} = require("./Utils/RequestRejectedEmail/SendRequestRejectedEmail");
+const {
+  sendInstructionEmail,
+} = require("./Utils/SendInstructionEmail/SendInstructionEmail");
 
 // Parsers
 app.use(
@@ -193,7 +202,9 @@ async function run() {
 
     // Update trainer status (Accept)
     app.post("/update-trainer-status/accept", async (req, res) => {
-      const { trainerId, status, email, role, salary } = req.body;
+      const { trainerId, status, email, role, salary, name } = req.body;
+
+      sendRequestAcceptedEmail(email, "Request Accepted", name);
 
       if (!ObjectId.isValid(trainerId)) {
         return res.status(400).json({ error: "Invalid trainerId format" });
@@ -220,13 +231,9 @@ async function run() {
 
     // Update trainer status (Reject)
     app.post("/update-trainer-status/reject", async (req, res) => {
-      const { trainerId, status, email } = req.body;
+      const { trainerId, status, email, name } = req.body;
 
-      sendMail(
-        email,
-        "Request Rejected",
-        "We are sorry to inform you that you are not yet eligible to be a trainer at FitSync. "
-      );
+      sendRequestRejectedEmail(email, "Request Rejected", name);
 
       if (!ObjectId.isValid(trainerId)) {
         return res.status(400).json({ error: "Invalid trainerId format" });
@@ -435,14 +442,14 @@ async function run() {
 
     // API endpoint to send email
     app.post("/send-instruction", express.json(), (req, res) => {
-      const { to, subject, message } = req.body;
+      const { to, subject, message, receiverName, trainer, slot } = req.body;
 
-      if (!to || !subject || !message) {
+      if (!to || !subject || !message || !receiverName || !trainer || !slot) {
         return res.status(400).json({ error: "Missing required parameters" });
       }
 
       try {
-        sendMail(to, subject, message);
+        sendInstructionEmail(to, subject, message, receiverName, trainer, slot);
         res
           .status(200)
           .json({ success: true, message: "Email sent successfully" });
