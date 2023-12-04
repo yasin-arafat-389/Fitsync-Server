@@ -17,6 +17,9 @@ const {
 const {
   sendInstructionEmail,
 } = require("./Utils/SendInstructionEmail/SendInstructionEmail");
+const {
+  slotCancelledEmail,
+} = require("./Utils/SlotCancelledEmail/SlotCancelledEmail");
 
 // Parsers
 app.use(
@@ -441,7 +444,7 @@ async function run() {
     });
 
     // API endpoint to send email
-    app.post("/send-instruction", express.json(), (req, res) => {
+    app.post("/send-instruction", (req, res) => {
       const { to, subject, message, receiverName, trainer, slot } = req.body;
 
       if (!to || !subject || !message || !receiverName || !trainer || !slot) {
@@ -455,6 +458,38 @@ async function run() {
           .json({ success: true, message: "Email sent successfully" });
       } catch (error) {
         console.error("Error sending email:", error);
+        res.status(500).json({ error: "Internal server error" });
+      }
+    });
+
+    // API endpoint to cancel a slot and send mail to members
+    app.post("/cancel-slot", async (req, res) => {
+      let { message, slot, trainer } = req.body;
+
+      try {
+        await client.connect();
+
+        const emails = await pricingCollection
+          .aggregate([
+            { $match: { trainer: trainer, slot: slot } },
+            { $group: { _id: null, emails: { $push: "$email" } } },
+            { $project: { _id: 0, emails: 1 } },
+          ])
+          .toArray();
+
+        const emailArray = emails.length > 0 ? emails[0].emails : [];
+
+        slotCancelledEmail(
+          emailArray,
+          "Slot Cancelled",
+          message,
+          trainer,
+          slot
+        );
+
+        res.send(emailArray);
+      } catch (error) {
+        console.error("Error:", error);
         res.status(500).json({ error: "Internal server error" });
       }
     });
