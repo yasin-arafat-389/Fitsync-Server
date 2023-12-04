@@ -467,8 +467,6 @@ async function run() {
       let { message, slot, trainer } = req.body;
 
       try {
-        await client.connect();
-
         const emails = await pricingCollection
           .aggregate([
             { $match: { trainer: trainer, slot: slot } },
@@ -492,6 +490,19 @@ async function run() {
         console.error("Error:", error);
         res.status(500).json({ error: "Internal server error" });
       }
+    });
+
+    // API endpoint to prevent a user from booking same slot twice
+    app.get("/prevent-booking", async (req, res) => {
+      let email = req.query.email;
+
+      const pricingData = await pricingCollection
+        .find({ email: email })
+        .toArray();
+
+      const slots = pricingData.map((item) => item.slot);
+
+      res.json({ slots: slots });
     });
 
     // Get member activity data
