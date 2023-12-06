@@ -97,6 +97,7 @@ async function run() {
   const adminBalanceCollection = client
     .db("FitSync")
     .collection("adminBalance");
+  const salaryCollection = client.db("FitSync").collection("salary");
 
   try {
     // Token generation API
@@ -205,7 +206,7 @@ async function run() {
 
     // Update trainer status (Accept)
     app.post("/update-trainer-status/accept", async (req, res) => {
-      const { trainerId, status, email, role, salary, name } = req.body;
+      const { trainerId, status, email, role, name } = req.body;
 
       sendRequestAcceptedEmail(email, "Request Accepted", name);
 
@@ -215,7 +216,7 @@ async function run() {
 
       const result1 = await trainersCollection.updateOne(
         { _id: new ObjectId(trainerId) },
-        { $set: { status: status, salary: salary } }
+        { $set: { status: status } }
       );
       let result2 = await usersCollection.updateOne(
         { email: email },
@@ -568,6 +569,42 @@ async function run() {
         res.status(500).json({ error: "Internal server error" });
       }
     });
+
+    //API endpoint to handle salary payment
+    app.post("/pay-salary", async (req, res) => {
+      const { trainer, month, status, email } = req.body;
+      const doc = { trainer, month, status, email };
+      await salaryCollection.insertOne(doc);
+
+      const adminBalance = await adminBalanceCollection.findOne();
+
+      const newTotalBalance = (adminBalance.totalBalance || 0) - 20;
+
+      await adminBalanceCollection.updateOne(
+        {},
+        { $set: { totalBalance: newTotalBalance } }
+      );
+
+      res.send("Succeed");
+    });
+
+    //API endpoint to get salary requests data
+    app.get("/salary-data", async (req, res) => {
+      const salaryData = await salaryCollection.find().toArray();
+      res.send(salaryData);
+    });
+
+    //API endpoint to get trainer specific salary data filtered by email
+    app.get("/salary-data/trainer", async (req, res) => {
+      let email = req.query.email;
+      const salaryData = await salaryCollection
+        .find({ email: email })
+        .toArray();
+
+      res.send(salaryData);
+    });
+
+    //
   } finally {
   }
 }
