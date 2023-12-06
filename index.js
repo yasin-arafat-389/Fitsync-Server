@@ -610,6 +610,19 @@ async function run() {
       res.send(salaryData);
     });
 
+    //API endpoint to assign an activity
+    app.post("/assign-activity", async (req, res) => {
+      const { email, slot, activity } = req.body;
+
+      const result = await pricingCollection.findOneAndUpdate(
+        { email, slot },
+        { $set: { activity } },
+        { returnDocument: "after" }
+      );
+
+      res.send(result);
+    });
+
     //
   } finally {
   }
