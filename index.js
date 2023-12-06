@@ -579,10 +579,16 @@ async function run() {
       const adminBalance = await adminBalanceCollection.findOne();
 
       const newTotalBalance = (adminBalance.totalBalance || 0) - 20;
+      const newTotalSalaryPaidBalance = (adminBalance.totalPaid || 0) + 20;
 
       await adminBalanceCollection.updateOne(
         {},
-        { $set: { totalBalance: newTotalBalance } }
+        {
+          $set: {
+            totalBalance: newTotalBalance,
+            totalPaid: newTotalSalaryPaidBalance,
+          },
+        }
       );
 
       res.send("Succeed");
