@@ -7,7 +7,7 @@ require("dotenv").config();
 const stripe = require("stripe")(process.env.STRIPE_SECRET);
 const app = express();
 const port = process.env.PORT || 5001;
-const nodemailer = require("nodemailer");
+
 const {
   sendRequestAcceptedEmail,
 } = require("./Utils/RequestAcceptedEmail/SendRequestAcceptedEmail");
@@ -51,30 +51,6 @@ const verifyToken = (req, res, next) => {
   });
 };
 
-// Node mailer
-const sendMail = (to, subject, text) => {
-  let transporter = nodemailer.createTransport({
-    service: "gmail",
-    host: process.env.SMTP_HOST,
-    port: process.env.SMTP_PORT,
-    secure: false,
-    auth: {
-      user: process.env.SMTP_MAIL,
-      pass: process.env.SMTP_PASSWORD,
-    },
-  });
-
-  transporter.sendMail({
-    from: {
-      name: "FitSync",
-      address: process.env.SMTP_MAIL,
-    },
-    to: to,
-    subject: subject,
-    text: text,
-  });
-};
-
 const uri = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASSWORD}@cluster0.gef2z8f.mongodb.net/?retryWrites=true&w=majority`;
 
 const client = new MongoClient(uri, {
@@ -109,6 +85,18 @@ async function run() {
       res.send({ token });
     });
 
+    // Admin verification
+    const verifyAdmin = async (req, res, next) => {
+      const email = req.user.email;
+      const query = { email: email };
+      const user = await usersCollection.findOne(query);
+      const isAdmin = user?.role === "admin";
+      if (!isAdmin) {
+        return res.status(403).send({ message: "forbidden access" });
+      }
+      next();
+    };
+
     // Creating a payment intent
     app.post("/create-payment-intent", async (req, res) => {
       const { price } = req.body;
@@ -123,18 +111,6 @@ async function run() {
         clientSecret: paymentIntent.client_secret,
       });
     });
-
-    // Admin verification
-    const verifyAdmin = async (req, res, next) => {
-      const email = req.decoded.email;
-      const query = { email: email };
-      const user = await usersCollection.findOne(query);
-      const isAdmin = user?.role === "admin";
-      if (!isAdmin) {
-        return res.status(403).send({ message: "forbidden access" });
-      }
-      next();
-    };
 
     // Store user info in the database
     app.post("/users", async (req, res) => {
@@ -153,6 +129,7 @@ async function run() {
       const email = req.query.email;
       const query = { email: email };
       const result = await usersCollection.findOne(query);
+
       res.send(result);
     });
 
@@ -178,7 +155,7 @@ async function run() {
     });
 
     //Get Newsletter
-    app.get("/all-Subscribers", async (req, res) => {
+    app.get("/all-Subscribers", verifyToken, verifyAdmin, async (req, res) => {
       const subscribers = await newsletterCollection.find().toArray();
       res.send(subscribers);
     });
@@ -268,13 +245,18 @@ async function run() {
     });
 
     // Get all trainer data (requested)
-    app.get("/all-trainers/requested", async (req, res) => {
-      const filter = "requested";
-      const trainers = await trainersCollection
-        .find({ status: filter })
-        .toArray();
-      res.send(trainers);
-    });
+    app.get(
+      "/all-trainers/requested",
+      verifyToken,
+      verifyAdmin,
+      async (req, res) => {
+        const filter = "requested";
+        const trainers = await trainersCollection
+          .find({ status: filter })
+          .toArray();
+        res.send(trainers);
+      }
+    );
 
     // Get single trainer data by email
     app.get("/trainers", async (req, res) => {
@@ -311,13 +293,23 @@ async function run() {
     });
 
     // Get all members who paid
-    app.get("/package/subscribed", async (req, res) => {
-      const result = await pricingCollection.find().toArray();
-      res.send(result);
-    });
+    app.get(
+      "/package/subscribed",
+      verifyToken,
+      verifyAdmin,
+      async (req, res) => {
+        const result = await pricingCollection.find().toArray();
+        res.send(result);
+      }
+    );
 
     // Get all members filtered by choosen trainer
-    app.get("/booked/trainer", async (req, res) => {
+    app.get("/booked/trainer", verifyToken, async (req, res) => {
+      if (req.query.email !== req.user.email) {
+        return res.status(403).send({
+          message: "You are trying to get data you have no access to",
+        });
+      }
       const email = req.query.email;
       const query = { trainerEmail: email };
       const result = await pricingCollection.find(query).toArray();
@@ -325,7 +317,7 @@ async function run() {
     });
 
     // Get admin balance
-    app.get("/balance", async (req, res) => {
+    app.get("/balance", verifyToken, verifyAdmin, async (req, res) => {
       const result = await adminBalanceCollection.findOne();
       res.send(result);
     });
@@ -507,7 +499,13 @@ async function run() {
     });
 
     // Get member activity data
-    app.get("/my-activity", async (req, res) => {
+    app.get("/my-activity", verifyToken, async (req, res) => {
+      if (req.query.email !== req.user.email) {
+        return res.status(403).send({
+          message: "You are trying to get data you have no access to",
+        });
+      }
+
       const userEmail = req.query.email;
 
       // Find pricing data for the user
@@ -547,29 +545,6 @@ async function run() {
       res.json({ pricingData: pricingDataWithImages, trainerDetails });
     });
 
-    // API endpoint to reject a member
-    app.post("/reject-member", (req, res) => {
-      const { email } = req.body;
-
-      if (!email) {
-        return res.status(400).json({ error: "Missing required parameters" });
-      }
-
-      try {
-        sendMail(
-          email,
-          "Slot Rejected",
-          "We are very sorry to inform you that your slot has been rejected by the trainer"
-        );
-        res
-          .status(200)
-          .json({ success: true, message: "Email sent successfully" });
-      } catch (error) {
-        console.error("Error sending email:", error);
-        res.status(500).json({ error: "Internal server error" });
-      }
-    });
-
     //API endpoint to handle salary payment
     app.post("/pay-salary", async (req, res) => {
       const { trainer, month, status, email } = req.body;
@@ -595,13 +570,18 @@ async function run() {
     });
 
     //API endpoint to get salary requests data
-    app.get("/salary-data", async (req, res) => {
+    app.get("/salary-data", verifyToken, verifyAdmin, async (req, res) => {
       const salaryData = await salaryCollection.find().toArray();
       res.send(salaryData);
     });
 
     //API endpoint to get trainer specific salary data filtered by email
-    app.get("/salary-data/trainer", async (req, res) => {
+    app.get("/salary-data/trainer", verifyToken, async (req, res) => {
+      if (req.query.email !== req.user.email) {
+        return res.status(403).send({
+          message: "You are trying to get data you have no access to",
+        });
+      }
       let email = req.query.email;
       const salaryData = await salaryCollection
         .find({ email: email })
